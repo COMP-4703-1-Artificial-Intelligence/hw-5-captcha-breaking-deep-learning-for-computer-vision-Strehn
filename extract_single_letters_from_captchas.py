@@ -8,6 +8,7 @@ import imutils
 CAPTCHA_IMAGE_FOLDER = "generated_captcha_images"
 OUTPUT_FOLDER = "extracted_letter_images"
 
+
 # Get a list of all the captcha images we need to process
 captcha_image_files = glob.glob(os.path.join(CAPTCHA_IMAGE_FOLDER, "*"))
 counts = {}
@@ -16,44 +17,66 @@ counts = {}
 for (i, captcha_image_file) in enumerate(captcha_image_files):
     print("[INFO] processing image {}/{}".format(i + 1, len(captcha_image_files)))
 
- # Since the filename contains the captcha text (i.e. "2A2X.png" has the text "2A2X"),
+    # Since the filename contains the captcha text (i.e. "2A2X.png" has the text "2A2X"),
     # grab the base filename as the text
     filename = os.path.basename(captcha_image_file)
     captcha_correct_text = os.path.splitext(filename)[0]
 
     # Load the image and convert it to grayscale
     image = cv2.imread(captcha_image_file)
+    if image is None:
+        print(f"[WARN] Could not read image: {captcha_image_file}")
+        continue
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
 
     # Add some extra padding around the image
     gray = cv2.copyMakeBorder(gray, 8, 8, 8, 8, cv2.BORDER_REPLICATE)
 
     # threshold the image (convert it to pure black and white)
-    thresh = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY_INV | cv2.THRESH_OTSU)[1]
+    thresh = cv2.threshold #write the rest of this command
 
-    # find the contours (continuous blobs of pixels) the image
-    contours = cv2.findContours(thresh.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    # find the contours (continuous blobs of pixels) in the image
+    contours_info = #write the rest of this command
+    
+    # OpenCV 4.x returns (contours, hierarchy); OpenCV 3.x returns (image, contours, hierarchy)
+    contours = contours_info[0] if len(contours_info) == 2 else contours_info[1]
 
-    # Hack for compatibility with different OpenCV versions
-    contours = contours[1] if imutils.is_cv3() else contours[0]
+    if not contours:
+        print(f"[WARN] No contours found in {captcha_image_file}")
+        continue
 
     letter_image_regions = []
 
- # Now we can loop through each of the four contours and extract the letter
+    # Now we can loop through each of the four contours and extract the letter
     # inside of each one
     for contour in contours:
+        # Skip empty or invalid contours
+        if contour is None or len(contour) == 0:
+            continue
+
         # Get the rectangle that contains the contour
+        (x, y, w, h) = cv2.boundingRect(contour)
+        if h == 0:
+            continue
 
-       # Compare the width and height of the contour to detect letters that
+        # Compare the width and height of the contour to detect letters that
         # are conjoined into one chunk
+        if w / h > 1.25:
+            # This contour is too wide to be a single letter!
+            # Split it in half into two letter regions!
+            half_width = int(w / 2)
+            letter_image_regions.append((x, y, half_width, h))
+            letter_image_regions.append((x + half_width, y, half_width, h))
+        else:
+            # This is a normal letter by itself
+            letter_image_regions.append((x, y, w, h))
 
-  
     # If we found more or less than 4 letters in the captcha, our letter extraction
     # didn't work correcly. Skip the image instead of saving bad training data!
     if len(letter_image_regions) != 4:
         continue
 
-   # Sort the detected letter images based on the x coordinate to make sure
+    # Sort the detected letter images based on the x coordinate to make sure
     # we are processing them from left-to-right so we match the right image
     # with the right letter
     letter_image_regions = sorted(letter_image_regions, key=lambda x: x[0])
