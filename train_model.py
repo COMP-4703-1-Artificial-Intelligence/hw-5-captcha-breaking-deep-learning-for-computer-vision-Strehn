@@ -62,18 +62,18 @@ model = Sequential()
 
 # First convolutional layer with max pooling
 model.add(Conv2D(20, (5, 5), padding="same", input_shape=(20, 20, 1), activation="relu"))
-model.add() #edit this
+model.add(MaxPooling2D(pool_size=(2, 2), strides=(2, 2)))
 
 # Second convolutional layer with max pooling
-model.add() #edit this
-model.add() #edit this
+model.add(Conv2D(50, (5, 5), padding="same", activation="relu"))
+model.add(MaxPooling2D(pool_size=(2, 2), strides=(2, 2)))
 
 # Hidden layer with 500 nodes
-model.add() #edit this
-model.add() #edit this
+model.add(Flatten())
+model.add(Dense(500, activation="relu"))
 
 # Output layer with 32 nodes (one for each possible letter/number we predict)
-model.add() #edit this
+model.add(Dense(32, activation="softmax"))
 
 # Ask Keras to build the TensorFlow model behind the scenes
 model.compile(loss="categorical_crossentropy", optimizer="adam", metrics=["accuracy"])

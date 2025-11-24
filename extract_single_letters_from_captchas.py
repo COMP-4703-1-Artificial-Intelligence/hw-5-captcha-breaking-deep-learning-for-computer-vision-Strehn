@@ -8,6 +8,7 @@ import imutils
 CAPTCHA_IMAGE_FOLDER = "generated_captcha_images"
 OUTPUT_FOLDER = "extracted_letter_images"
 
+
 # Get a list of all the captcha images we need to process
 captcha_image_files = glob.glob(os.path.join(CAPTCHA_IMAGE_FOLDER, "*"))
 counts = {}
@@ -16,7 +17,7 @@ counts = {}
 for (i, captcha_image_file) in enumerate(captcha_image_files):
     print("[INFO] processing image {}/{}".format(i + 1, len(captcha_image_files)))
 
- # Since the filename contains the captcha text (i.e. "2A2X.png" has the text "2A2X"),
+    # Since the filename contains the captcha text (i.e. "2A2X.png" has the text "2A2X"),
     # grab the base filename as the text
     filename = os.path.basename(captcha_image_file)
     captcha_correct_text = os.path.splitext(filename)[0]
@@ -35,25 +36,34 @@ for (i, captcha_image_file) in enumerate(captcha_image_files):
     contours = cv2.findContours(thresh.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
     # Hack for compatibility with different OpenCV versions
-    contours = contours[1] if imutils.is_cv3() else contours[0]
+    contours = contours[0] if imutils.is_cv2() else contours[1]
 
     letter_image_regions = []
 
- # Now we can loop through each of the four contours and extract the letter
+    # Now we can loop through each of the four contours and extract the letter
     # inside of each one
     for contour in contours:
         # Get the rectangle that contains the contour
+        (x, y, w, h) = cv2.boundingRect(contour)
 
-       # Compare the width and height of the contour to detect letters that
+        # Compare the width and height of the contour to detect letters that
         # are conjoined into one chunk
+        if w / h > 1.25:
+            # This contour is too wide to be a single letter!
+            # Split it in half into two letter regions!
+            half_width = int(w / 2)
+            letter_image_regions.append((x, y, half_width, h))
+            letter_image_regions.append((x + half_width, y, half_width, h))
+        else:
+            # This is a normal letter by itself
+            letter_image_regions.append((x, y, w, h))
 
-  
     # If we found more or less than 4 letters in the captcha, our letter extraction
     # didn't work correcly. Skip the image instead of saving bad training data!
     if len(letter_image_regions) != 4:
         continue
 
-   # Sort the detected letter images based on the x coordinate to make sure
+    # Sort the detected letter images based on the x coordinate to make sure
     # we are processing them from left-to-right so we match the right image
     # with the right letter
     letter_image_regions = sorted(letter_image_regions, key=lambda x: x[0])
