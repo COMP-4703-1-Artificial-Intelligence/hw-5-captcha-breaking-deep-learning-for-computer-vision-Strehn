@@ -1,3 +1,14 @@
+"""
+Homework Part 3: Solve CAPTCHAs Using the Trained Model
+
+Goal: Apply the trained model to new CAPTCHA images, segment characters, and compute accuracy.
+
+Tasks:
+- TODO: Parameterize sample size via CLI and compute accuracy across that sample.
+- TODO: Save a few annotated outputs and include them in your submission.
+- TODO: Log and analyze failure cases (e.g., wrong number of letters, no contours).
+"""
+
 from tensorflow.keras.models import load_model
 from helpers import resize_to_fit
 from imutils import paths
@@ -5,11 +16,22 @@ import numpy as np
 import imutils
 import cv2
 import pickle
+import argparse
+import os
 
 
 MODEL_FILENAME = "captcha_model.hdf5"
 MODEL_LABELS_FILENAME = "model_labels.dat"
 CAPTCHA_IMAGE_FOLDER = "generated_captcha_images"
+
+# Argument parsing for evaluation
+parser = argparse.ArgumentParser(description="Solve CAPTCHAs with trained model")
+parser.add_argument("--image-folder", default=CAPTCHA_IMAGE_FOLDER, help="Folder containing CAPTCHA images")
+parser.add_argument("--samples", type=int, default=10, help="Number of random CAPTCHA images to evaluate")
+parser.add_argument("--save-outputs", action="store_true", help="Save annotated outputs to ./outputs/")
+args = parser.parse_args()
+
+CAPTCHA_IMAGE_FOLDER = args.image_folder
 
 
 # Load up the model labels (so we can translate model predictions to actual letters)
@@ -23,7 +45,21 @@ model = load_model(MODEL_FILENAME)
 # In the real world, you'd replace this section with code to grab a real
 # CAPTCHA image from a live website.
 captcha_image_files = list(paths.list_images(CAPTCHA_IMAGE_FOLDER))
-captcha_image_files = np.random.choice(captcha_image_files, size=(10,), replace=False)
+if len(captcha_image_files) == 0:
+    raise SystemExit(f"No images found in {CAPTCHA_IMAGE_FOLDER}")
+
+if len(captcha_image_files) < args.samples:
+    print(f"[WARN] Requested {args.samples} samples but only {len(captcha_image_files)} available. Using all.")
+    sample_size = len(captcha_image_files)
+else:
+    sample_size = args.samples
+
+captcha_image_files = np.random.choice(captcha_image_files, size=(sample_size,), replace=False)
+
+# Metrics counters
+num_total = 0
+num_correct = 0
+num_skipped = 0
 
 # loop over the image paths
 for image_file in captcha_image_files:
@@ -31,6 +67,7 @@ for image_file in captcha_image_files:
     image = cv2.imread(image_file)
     if image is None:
         print(f"[WARN] Could not read image: {image_file}")
+        num_skipped += 1
         continue
     image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
 
@@ -47,6 +84,7 @@ for image_file in captcha_image_files:
 
     if not contours:
         print(f"[WARN] No contours found in {image_file}")
+        num_skipped += 1
         continue
 
     letter_image_regions = []
@@ -78,6 +116,7 @@ for image_file in captcha_image_files:
     # If we found more or less than 4 letters in the captcha, our letter extraction
     # didn't work correcly. Skip the image instead of saving bad training data!
     if len(letter_image_regions) != 4:
+        num_skipped += 1
         continue
 
     # Sort the detected letter images based on the x coordinate to make sure
@@ -119,6 +158,24 @@ for image_file in captcha_image_files:
     captcha_text = "".join(predictions)
     print("CAPTCHA text is: {}".format(captcha_text))
 
+    num_total += 1
+    # Ground truth from filename
+    gt = os.path.splitext(os.path.basename(image_file))[0]
+    if captcha_text == gt:
+        num_correct += 1
+
+    if args.save_outputs:
+        os.makedirs("outputs", exist_ok=True)
+        output_path = os.path.join("outputs", f"{gt}_pred.png")
+        cv2.imwrite(output_path, output)
+
     # Show the annotated image
     cv2.imshow("Output", output)
     cv2.waitKey()
+
+# Final report
+if num_total > 0:
+    acc = num_correct / num_total
+    print(f"\n[REPORT] Evaluated: {num_total}  Correct: {num_correct}  Accuracy: {acc:.3f}  Skipped: {num_skipped}")
+else:
+    print("[REPORT] No images evaluated.")
