@@ -3,6 +3,13 @@ Evaluate CAPTCHA Solving Accuracy
 
 Uses solve_captchas_with_model.py logic to compute accuracy over a random subset
 of CAPTCHA images. Intended as a quick validation tool for the homework.
+
+python3 evaluate_solve_accuracy.py --help       
+optional arguments:
+  -h, --help            show this help message and exit
+  --image-folder IMAGE_FOLDER
+                        Folder containing CAPTCHA images
+  --samples SAMPLES     Number of random images to evaluate
 """
 import os
 import argparse
